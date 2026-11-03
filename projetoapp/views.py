@@ -195,7 +195,35 @@ def cardapioPublico(request):
         textos['pratos'] = 'Main courses'
         textos['detalhes'] = 'See details'
         textos['indisponivel'] = 'Unavailable right now'
-    return render(request, 'cardapioPublico.html', {'textos': textos, 'idioma': idioma})
+
+    precos = {'bruschetta': 24.00, 'arancini': 29.90, 'carbonara': 49.90, 'lasanha': 46.90}
+    simbolos = {'BRL': 'R$', 'USD': 'US$', 'EUR': '€', 'GBP': '£'}
+
+    moeda = request.GET.get('moeda', 'BRL')
+    if moeda not in simbolos:
+        moeda = 'BRL'
+
+    cotacao = 1
+    if moeda != 'BRL':
+        try:
+            resposta = requests.get(f'https://economia.awesomeapi.com.br/json/last/{moeda}-BRL', timeout=5)
+            cotacao = float(resposta.json()[f'{moeda}BRL']['bid'])
+        except (requests.RequestException, ValueError, KeyError):
+            moeda = 'BRL'
+
+    for chave, valor in precos.items():
+        convertido = f'{valor / cotacao:.2f}'
+        if moeda == 'BRL':
+            convertido = convertido.replace('.', ',')
+        precos[chave] = f'{simbolos[moeda]} {convertido}'
+
+    return render(request, 'cardapioPublico.html', {
+        'textos': textos,
+        'idioma': idioma,
+        'precos': precos,
+        'moeda': moeda,
+        'moedas': simbolos,
+    })
 
 def detalhesProduto(request):
     return render(request, 'detalhesProduto.html')

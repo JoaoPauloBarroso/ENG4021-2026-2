@@ -15,6 +15,12 @@
         <img src="{% static 'css/JulianaBassan/novalogo.jpg' %}" alt="Logo do FoodLink" width="80">
     </div>
 
+    <div class="moedas">
+        {% for codigo, simbolo in moedas.items %}
+            <a href="?idioma={{ idioma }}&moeda={{ codigo }}" class="{% if codigo == moeda %}ativa{% endif %}" title="{{ codigo }}">{{ simbolo }}</a>
+        {% endfor %}
+    </div>
+
     <div class="centralizacao">
         <div class="cardapio">
             <h1>Casa di Pasta</h1>
@@ -25,9 +31,9 @@
                 <a href="#entradas">{{ textos.entradas }}</a>
                 <a href="#pratos">{{ textos.pratos }}</a>
                 {% if idioma == 'en' %}
-                    <a href="?idioma=pt">Português</a>
+                    <a href="?idioma=pt&moeda={{ moeda }}">Português</a>
                 {% else %}
-                    <a href="?idioma=en">English</a>
+                    <a href="?idioma=en&moeda={{ moeda }}">English</a>
                 {% endif %}
             </div>
 
@@ -38,7 +44,7 @@
                 <div>
                     <h3>Bruschetta da casa</h3>
                     <p>{{ textos.bruschetta }}</p>
-                    <p class="preco">R$ 24,00</p>
+                    <p class="preco">{{ precos.bruschetta }}</p>
                     <a href="{% url 'detalhesProduto' %}">{{ textos.detalhes }}</a>
                 </div>
             </div>
@@ -48,7 +54,7 @@
                 <div>
                     <h3>Arancini de queijo</h3>
                     <p>{{ textos.arancini }}</p>
-                    <p class="preco">R$ 29,90</p>
+                    <p class="preco">{{ precos.arancini }}</p>
                     <p class="indisponivel">{{ textos.indisponivel }}</p>
                 </div>
             </div>
@@ -60,7 +66,7 @@
                 <div>
                     <h3>Spaghetti alla carbonara</h3>
                     <p>{{ textos.carbonara }}</p>
-                    <p class="preco">R$ 49,90</p>
+                    <p class="preco">{{ precos.carbonara }}</p>
                 </div>
             </div>
 
@@ -69,7 +75,7 @@
                 <div>
                     <h3>Lasanha à bolonhesa</h3>
                     <p>{{ textos.lasanha }}</p>
-                    <p class="preco">R$ 46,90</p>
+                    <p class="preco">{{ precos.lasanha }}</p>
                 </div>
             </div>
         </div>
