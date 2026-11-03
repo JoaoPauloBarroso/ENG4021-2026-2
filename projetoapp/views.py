@@ -1,5 +1,6 @@
 from django.shortcuts import render, redirect
 import requests
+from datetime import date
 from .models import Produto, Restaurante
 from .forms import ProdutoForm, CadastroForm, LoginForm, CategoriaForm, RestauranteForm, EsqueciSenhaForm, NovaSenhaForm
 from django.contrib.auth.models import User
@@ -217,7 +218,32 @@ def cardapioPublico(request):
             convertido = convertido.replace('.', ',')
         precos[chave] = f'{simbolos[moeda]} {convertido}'
 
+    feriado = None
+    hoje = date.today()
+    try:
+        for ano in [hoje.year, hoje.year + 1]:
+            resposta = requests.get(f'https://brasilapi.com.br/api/feriados/v1/{ano}', timeout=5)
+            for item in resposta.json():
+                dia = date.fromisoformat(item['date'])
+                if dia >= hoje:
+                    feriado = {'nome': item['name'], 'data': dia.strftime('%d/%m'), 'hoje': dia == hoje}
+                    break
+            if feriado:
+                break
+    except (requests.RequestException, ValueError, KeyError, TypeError):
+        feriado = None
+
+    if idioma == 'en':
+        textos['feriado_hoje'] = 'Today is a holiday'
+        textos['proximo_feriado'] = 'Next holiday'
+        textos['aviso_feriado'] = 'opening hours may change.'
+    else:
+        textos['feriado_hoje'] = 'Hoje é feriado'
+        textos['proximo_feriado'] = 'Próximo feriado'
+        textos['aviso_feriado'] = 'o horário de funcionamento pode mudar.'
+
     return render(request, 'cardapioPublico.html', {
+        'feriado': feriado,
         'textos': textos,
         'idioma': idioma,
         'precos': precos,
