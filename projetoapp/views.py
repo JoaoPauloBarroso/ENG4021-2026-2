@@ -16,6 +16,7 @@ from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
 from django.utils.encoding import force_bytes
 from django.urls import reverse
 from django.conf import settings
+from django.utils.text import slugify
 from .forms import ConsultaCEPForm
 
 
@@ -175,29 +176,33 @@ def meuRestaurante(request):
 def cardapioPublico(request):
     textos = {
         'descricao': 'Massas artesanais e receitas de família.',
-        'entradas': 'Entradas',
-        'pratos': 'Pratos principais',
-        'bruschetta': 'Pão tostado com tomate e manjericão.',
-        'arancini': 'Bolinhos de risoto recheados com queijo.',
-        'carbonara': 'Massa com guanciale, queijo e gemas.',
-        'lasanha': 'Massa fresca, molho de carne e queijo gratinado.',
         'detalhes': 'Ver detalhes',
-        'indisponivel': 'Indisponível no momento',
+        'sem_produtos': 'Nenhum produto cadastrado ainda.',
     }
 
     idioma = request.GET.get('idioma', 'pt')
+
+    # Traduz um texto para inglês; se a API falhar, mantém o texto original
+    traducoes = {}
+    def traduzir(texto):
+        if idioma != 'en' or not texto:
+            return texto
+        if texto not in traducoes:
+            try:
+                resposta = requests.get('https://api.mymemory.translated.net/get', params={'q': texto, 'langpair': 'pt|en'}, timeout=5)
+                traducoes[texto] = resposta.json()['responseData']['translatedText']
+            except (requests.RequestException, ValueError, KeyError, TypeError):
+                traducoes[texto] = texto
+        return traducoes[texto]
+
+    # Nomes de categoria comuns já traduzidos (a API traduz "Entradas" como "Inflows")
+    traducoes.update({'Entradas': 'Starters', 'Pratos principais': 'Main courses', 'Bebidas': 'Drinks', 'Sobremesas': 'Desserts'})
+
+    textos['descricao'] = traduzir(textos['descricao'])
     if idioma == 'en':
-        descricoes = ['descricao', 'bruschetta', 'arancini', 'carbonara', 'lasanha']
-        for chave in descricoes:
-            resposta = requests.get('https://api.mymemory.translated.net/get', params={'q': textos[chave], 'langpair': 'pt|en'})
-            textos[chave] = resposta.json()['responseData']['translatedText']
-
-        textos['entradas'] = 'Starters'
-        textos['pratos'] = 'Main courses'
         textos['detalhes'] = 'See details'
-        textos['indisponivel'] = 'Unavailable right now'
+        textos['sem_produtos'] = 'No products yet.'
 
-    precos = {'bruschetta': 24.00, 'arancini': 29.90, 'carbonara': 49.90, 'lasanha': 46.90}
     simbolos = {'BRL': 'R$', 'USD': 'US$', 'EUR': '€', 'GBP': '£'}
 
     moeda = request.GET.get('moeda', 'BRL')
@@ -212,11 +217,24 @@ def cardapioPublico(request):
         except (requests.RequestException, ValueError, KeyError):
             moeda = 'BRL'
 
-    for chave, valor in precos.items():
-        convertido = f'{valor / cotacao:.2f}'
+    # Produtos cadastrados pelo dono, agrupados por categoria
+    categorias = {}
+    for produto in Produto.objects.order_by('categoria', 'nome'):
+        convertido = f'{float(produto.preco) / cotacao:.2f}'
         if moeda == 'BRL':
             convertido = convertido.replace('.', ',')
-        precos[chave] = f'{simbolos[moeda]} {convertido}'
+
+        if produto.categoria not in categorias:
+            categorias[produto.categoria] = {
+                'nome': traduzir(produto.categoria),
+                'ancora': slugify(produto.categoria),
+                'produtos': [],
+            }
+        categorias[produto.categoria]['produtos'].append({
+            'produto': produto,
+            'descricao': traduzir(produto.descricao),
+            'preco': f'{simbolos[moeda]} {convertido}',
+        })
 
     feriado = None
     hoje = date.today()
@@ -246,7 +264,7 @@ def cardapioPublico(request):
         'feriado': feriado,
         'textos': textos,
         'idioma': idioma,
-        'precos': precos,
+        'categorias': categorias.values(),
         'moeda': moeda,
         'moedas': simbolos,
     })
